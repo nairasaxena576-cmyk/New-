@@ -1,0 +1,36 @@
+export const countries = [
+  { code: '+1', iso: 'US', name: 'United States', flag: '🇺🇸' },
+  { code: '+44', iso: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: '+33', iso: 'FR', name: 'France', flag: '🇫🇷' },
+  { code: '+49', iso: 'DE', name: 'Germany', flag: '🇩🇪' },
+  { code: '+34', iso: 'ES', name: 'Spain', flag: '🇪🇸' },
+  { code: '+39', iso: 'IT', name: 'Italy', flag: '🇮🇹' },
+  { code: '+31', iso: 'NL', name: 'Netherlands', flag: '🇳🇱' },
+  { code: '+86', iso: 'CN', name: 'China', flag: '🇨🇳' },
+  { code: '+81', iso: 'JP', name: 'Japan', flag: '🇯🇵' },
+  { code: '+82', iso: 'KR', name: 'South Korea', flag: '🇰🇷' },
+  { code: '+91', iso: 'IN', name: 'India', flag: '🇮🇳' },
+  { code: '+61', iso: 'AU', name: 'Australia', flag: '🇦🇺' },
+  { code: '+55', iso: 'BR', name: 'Brazil', flag: '🇧🇷' },
+  { code: '+52', iso: 'MX', name: 'Mexico', flag: '🇲🇽' },
+  { code: '+7', iso: 'RU', name: 'Russia', flag: '🇷🇺' },
+  { code: '+27', iso: 'ZA', name: 'South Africa', flag: '🇿🇦' },
+  { code: '+234', iso: 'NG', name: 'Nigeria', flag: '🇳🇬' },
+  { code: '+971', iso: 'AE', name: 'UAE', flag: '🇦🇪' },
+  { code: '+966', iso: 'SA', name: 'Saudi Arabia', flag: '🇸🇦' },
+  { code: '+90', iso: 'TR', name: 'Turkey', flag: '🇹🇷' },
+  { code: '+62', iso: 'ID', name: 'Indonesia', flag: '🇮🇩' },
+  { code: '+60', iso: 'MY', name: 'Malaysia', flag: '🇲🇾' },
+  { code: '+65', iso: 'SG', name: 'Singapore', flag: '🇸🇬' },
+  { code: '+66', iso: 'TH', name: 'Thailand', flag: '🇹🇭' },
+  { code: '+84', iso: 'VN', name: 'Vietnam', flag: '🇻🇳' },
+  { code: '+92', iso: 'PK', name: 'Pakistan', flag: '🇵🇰' },
+  { code: '+880', iso: 'BD', name: 'Bangladesh', flag: '🇧🇩' },
+  { code: '+20', iso: 'EG', name: 'Egypt', flag: '🇪🇬' },
+  { code: '+234', iso: 'KE', name: 'Kenya', flag: '🇰🇪' },
+  { code: '+254', iso: 'GH', name: 'Ghana', flag: '🇬🇭' },
+];
+
+export type Country = (typeof countries)[number];
+
+export const defaultCountry = countries[0];

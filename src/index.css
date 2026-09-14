@@ -1,0 +1,194 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Hawksem Design System */
+    --background: 42 33% 98%;
+    --foreground: 222 39% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary #2563EB */
+    --primary: 224 53% 18%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary #1E40AF */
+    --secondary: 224 33% 32%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Success #16A34A */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning #F59E0B */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Danger #DC2626 */
+    --danger: 0 72% 51%;
+    --danger-foreground: 0 0% 100%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 42 28% 93%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 224 53% 18%;
+
+    /* Radii — 16px global corner */
+    --radius: 1rem;
+
+    /* Soft shadows */
+    --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 4px 16px rgba(16, 24, 40, 0.06);
+    --shadow-pop: 0 8px 32px rgba(16, 24, 40, 0.12);
+
+    --chart-1: 221 83% 53%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 224 76% 40%;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 221 83% 60%;
+    --primary-foreground: 222 47% 7%;
+
+    --secondary: 224 76% 52%;
+    --secondary-foreground: 222 47% 7%;
+
+    --success: 142 71% 50%;
+    --success-foreground: 222 47% 7%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 222 47% 7%;
+
+    --danger: 0 72% 58%;
+    --danger-foreground: 222 47% 7%;
+
+    --muted: 217 33% 16%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 33% 16%;
+    --accent-foreground: 210 40% 96%;
+
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 210 40% 96%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 221 83% 60%;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.35);
+    --shadow-pop: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+    --chart-1: 221 83% 60%;
+    --chart-2: 142 71% 50%;
+    --chart-3: 38 92% 55%;
+    --chart-4: 0 72% 58%;
+    --chart-5: 224 76% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.01em;
+  }
+
+  /* Pleasant focus ring everywhere */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring/60 ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-pop {
+    box-shadow: var(--shadow-pop);
+  }
+
+  /* Hide scrollbar but keep scroll */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Glassmorphism helper */
+  .glass {
+    background: hsl(var(--card) / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Announcement marquee */
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+}
+
+/* Custom scrollbar for the app */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
