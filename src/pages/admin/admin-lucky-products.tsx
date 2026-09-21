@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Sparkles,
   Search,
@@ -13,13 +13,11 @@ import {
   Power,
   Users,
   Settings2,
-  Crown,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { NexCard, NexBadge } from '@/components/ui/nex';
 import { NexButton } from '@/components/ui/nex-button';
 import { NexInput } from '@/components/ui/nex-input';
-import { NexTextarea } from '@/components/ui/nex-textarea';
 import {
   NexModal,
   NexModalContent,
@@ -91,6 +89,7 @@ export function AdminLuckyProductsPage() {
   const [savingForm, setSavingForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [showUserSettings, setShowUserSettings] = useState(false);
 
   const loadProducts = useCallback(async () => {
@@ -137,7 +136,7 @@ export function AdminLuckyProductsPage() {
     const count = luckyProducts.length;
     const avg =
       count > 0
-        ? luckyProducts.reduce((sum, p) => sum + Number(p.lucky_commission_percent) || 0, 0) / count
+        ? luckyProducts.reduce((sum, p) => sum + (Number(p.lucky_commission_percent) || 0), 0) / count
         : 0;
     return { count, avg };
   }, [luckyProducts]);
@@ -217,6 +216,8 @@ export function AdminLuckyProductsPage() {
   }
 
   async function handleToggleActive(product: ProductRow) {
+    if (togglingId) return;
+    setTogglingId(product.id);
     try {
       await updateProduct(product.id, { is_lucky: !product.is_lucky });
       await logActivity('admin', 'toggle_lucky_status', 'product', product.id, `${product.is_lucky ? 'Disabled' : 'Enabled'} lucky product "${product.name}"`);
@@ -224,6 +225,8 @@ export function AdminLuckyProductsPage() {
       await loadProducts();
     } catch {
       toast.error('Failed to toggle status');
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -424,6 +427,7 @@ export function AdminLuckyProductsPage() {
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => handleToggleActive(product)}
+                          disabled={togglingId === product.id}
                           aria-label="Toggle active"
                         >
                           <Power className={cn('size-3.5', product.is_lucky ? 'text-success' : 'text-muted-foreground')} />
@@ -724,6 +728,12 @@ function UserLuckySettingsModal({
       toast.error('Commission must be 0-100');
       return;
     }
+    const luckyMinPrice = formState.lucky_min_price ? parseFloat(formState.lucky_min_price) : null;
+    const luckyMaxPrice = formState.lucky_max_price ? parseFloat(formState.lucky_max_price) : null;
+    if (luckyMinPrice != null && luckyMaxPrice != null && luckyMinPrice > luckyMaxPrice) {
+      toast.error('Invalid price range', { description: 'Minimum price cannot be greater than maximum price.' });
+      return;
+    }
     setSaving(true);
     try {
       await adminUpdateUserLuckySettings({
@@ -733,8 +743,8 @@ function UserLuckySettingsModal({
         luckyChancePercent: chance,
         luckyCommissionPercent: commission,
         luckyDailyLimit: parseInt(formState.lucky_daily_limit) || 0,
-        luckyMinPrice: formState.lucky_min_price ? parseFloat(formState.lucky_min_price) : null,
-        luckyMaxPrice: formState.lucky_max_price ? parseFloat(formState.lucky_max_price) : null,
+        luckyMinPrice,
+        luckyMaxPrice,
       });
       toast.success('Settings saved');
       setEditingUserId(null);

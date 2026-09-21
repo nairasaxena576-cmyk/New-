@@ -356,7 +356,7 @@ export function AdminUsersPage() {
               {/* Mobile cards */}
               <div className="space-y-3 sm:hidden">
                 {paginated.map((user, i) => {
-                  const vipLevel = computeVipLevel(user.total_deposits);
+                  const vipLevel = computeVipLevel(Number(user.balance));
                   const status = getActiveStatus(user);
                   return (
                     <motion.div

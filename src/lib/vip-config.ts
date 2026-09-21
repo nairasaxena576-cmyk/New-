@@ -28,7 +28,6 @@ export function getRuntimeVipConfig(): VipConfig[] {
   return runtimeConfig;
 }
 
-const VIP_MAP: Record<number, VipConfig> = {};
 function getMap(): Record<number, VipConfig> {
   return Object.fromEntries(runtimeConfig.map((v) => [v.level, v]));
 }

@@ -1,11 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Search, Plus, Pencil, Trash2, Loader2, Star, AlertTriangle, X } from 'lucide-react';
+import { Package, Search, Plus, Pencil, Trash2, Loader2, Star, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { NexCard, NexBadge } from '@/components/ui/nex';
 import { NexButton } from '@/components/ui/nex-button';
 import { NexInput } from '@/components/ui/nex-input';
-import { NexTextarea } from '@/components/ui/nex-textarea';
 import { NexModal, NexModalContent, NexModalHeader, NexModalFooter, NexModalTitle, NexModalDescription } from '@/components/ui/nex-modal';
 import { EmptyState } from '@/components/ui/empty-state';
 import { fetchProducts, insertProduct, updateProduct, deleteProduct, logActivity, type ProductRow } from '@/lib/supabase/deposits';

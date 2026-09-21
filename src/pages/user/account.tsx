@@ -90,9 +90,9 @@ export function AccountPage() {
     };
   }, [user?.id]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsLoggingOut(true);
-    logout();
+    await logout();
     navigate('/login', { replace: true });
   };
 
@@ -292,6 +292,35 @@ export function AccountPage() {
                   <div key={r.id} className="flex items-center justify-between p-4">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground">+{formatAmount(Number(r.referral_bonus))}</p>
+                      <p className="text-xs text-muted-foreground">
+                        25% of {formatAmount(Number(r.original_reward))} · Order {r.order_number ?? '—'}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </NexCard>
+
+          {/* Recent referral rewards given to invited users */}
+          <NexCard className="overflow-hidden">
+            <div className="border-b border-border p-4">
+              <div className="flex items-center gap-2">
+                <Gift className="size-4 text-primary" />
+                <h3 className="text-sm font-bold text-foreground">Bonuses You've Given</h3>
+              </div>
+            </div>
+            {rewardsGiven.length === 0 ? (
+              <p className="p-6 text-center text-sm text-muted-foreground">No bonuses generated yet. When you complete tasks, your invited users earn a 25% bonus here.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {rewardsGiven.slice(0, 5).map((r) => (
+                  <div key={r.id} className="flex items-center justify-between p-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{formatAmount(Number(r.referral_bonus))}</p>
                       <p className="text-xs text-muted-foreground">
                         25% of {formatAmount(Number(r.original_reward))} · Order {r.order_number ?? '—'}
                       </p>

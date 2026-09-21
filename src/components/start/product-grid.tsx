@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Store } from 'lucide-react';
 import { NexBadge } from '@/components/ui/nex-badge';

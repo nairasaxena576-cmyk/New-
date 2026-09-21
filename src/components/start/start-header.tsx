@@ -10,7 +10,7 @@ interface StartHeaderProps {
   notifications?: number;
 }
 
-export function StartHeader({ vipLevel, notifications = 3 }: StartHeaderProps) {
+export function StartHeader({ vipLevel, notifications = 0 }: StartHeaderProps) {
   const navigate = useNavigate();
 
   return (

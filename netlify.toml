@@ -1,0 +1,27 @@
+# Hawksem — Netlify configuration.
+#
+# Architecture: Netlify serves ONLY the static Vite/React build (dist/).
+# The backend is entirely Supabase (Auth, PostgreSQL, RPCs, RLS, Storage,
+# Realtime); there are no Netlify Functions and no separate API server.
+#
+# Required build-time environment variables (set in the Netlify UI under
+# Site configuration > Environment variables — never commit their values):
+#   VITE_SUPABASE_URL
+#   VITE_SUPABASE_ANON_KEY
+# Vite inlines VITE_* values at build time, so they must exist BEFORE the
+# deploy that builds the site.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # react-router-dom 7 requires Node >= 20 (Vite 5: ^18 || >=20).
+  NODE_VERSION = "22"
+
+# The app uses react-router BrowserRouter, so every path must serve index.html
+# or hard refreshes / direct links (e.g. /admin/users) would 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

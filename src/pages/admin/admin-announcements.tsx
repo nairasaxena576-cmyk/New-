@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Megaphone, Plus, Pencil, Trash2, Loader2, AlertTriangle, Info, CheckCircle2, AlertCircle, XCircle, ToggleLeft, ToggleRight } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
-import { NexCard, NexCardHeader, NexCardTitle, NexCardContent, NexBadge } from '@/components/ui/nex';
+import { NexCard, NexBadge } from '@/components/ui/nex';
 import { NexButton } from '@/components/ui/nex-button';
 import { NexInput } from '@/components/ui/nex-input';
 import { NexTextarea } from '@/components/ui/nex-textarea';

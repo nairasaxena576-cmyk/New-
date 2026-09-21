@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, ShieldAlert, Lock, KeyRound, Loader2 } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Lock, KeyRound } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { NexCard, NexBadge } from '@/components/ui/nex';
 import { NexButton } from '@/components/ui/nex-button';
 import { NexInput } from '@/components/ui/nex-input';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/client';
-import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth';
 
 export function AdminSecurityPage() {
+  const { user } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,6 +18,10 @@ export function AdminSecurityPage() {
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
+    if (!currentPassword) {
+      toast.error('Current password required', { description: 'Enter your current password to confirm this change.' });
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast.error('Passwords do not match', { description: 'New password and confirmation must be identical.' });
       return;
@@ -27,6 +32,17 @@ export function AdminSecurityPage() {
     }
     setSaving(true);
     try {
+      // Re-authenticate with the current password before allowing the change —
+      // supabase.auth.updateUser() only requires a valid session, not proof of
+      // the existing password, so without this check a hijacked session could
+      // silently lock the real admin out.
+      if (!user?.email) throw new Error('Unable to verify current session');
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (reauthError) throw new Error('Current password is incorrect');
+
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       toast.success('Password updated', { description: 'Your admin password has been changed.' });
@@ -85,6 +101,17 @@ export function AdminSecurityPage() {
           </div>
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-foreground">Current Password</label>
+              <NexInput
+                type="password"
+                placeholder="Enter current password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
               <label className="text-sm font-semibold text-foreground">New Password</label>
               <NexInput
                 type="password"
@@ -106,7 +133,7 @@ export function AdminSecurityPage() {
                 required
               />
             </div>
-            <NexButton type="submit" isLoading={saving} disabled={!newPassword || !confirmPassword}>
+            <NexButton type="submit" isLoading={saving} disabled={!currentPassword || !newPassword || !confirmPassword}>
               Update Password
             </NexButton>
           </form>

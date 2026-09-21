@@ -124,7 +124,12 @@ export function RechargePage() {
       setNote('');
       clearFile();
     } catch (error) {
-      toast.error('Deposit submission failed', { description: error instanceof Error ? error.message : 'Please try again.' });
+      toast.error('Deposit submission failed', {
+        description:
+          error instanceof Error && import.meta.env.DEV
+            ? error.message
+            : 'Unable to submit your deposit request. Please try again.',
+      });
     } finally {
       setSubmitting(false);
     }

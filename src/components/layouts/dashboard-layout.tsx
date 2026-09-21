@@ -30,7 +30,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/lib/auth';
 import { languages } from '@/lib/home/constants';
-import { cn } from '@/lib/utils';
 
 function DashboardTopBar() {
   const { user, logout } = useAuth();
@@ -38,9 +37,9 @@ function DashboardTopBar() {
   const [lang, setLang] = useState(languages[0]);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsLoggingOut(true);
-    logout();
+    await logout();
     navigate('/login', { replace: true });
   };
 

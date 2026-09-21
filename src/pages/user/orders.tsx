@@ -20,6 +20,11 @@ import { cn } from '@/lib/utils';
 
 type Filter = 'all' | 'completed';
 
+const statusConfig: Record<string, { label: string; variant: 'warning' | 'success' | 'danger' }> = {
+  completed: { label: 'Completed', variant: 'success' },
+  pending_insufficient: { label: 'Awaiting Deposit', variant: 'warning' },
+};
+
 export function OrdersPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -69,7 +74,10 @@ export function OrdersPage() {
   }, [orders, filter]);
 
   const totalCommission = useMemo(
-    () => orders.reduce((sum, o) => sum + Number(o.commission), 0),
+    () =>
+      orders
+        .filter((o) => o.status === 'completed')
+        .reduce((sum, o) => sum + Number(o.commission), 0),
     [orders]
   );
 
@@ -156,6 +164,7 @@ export function OrdersPage() {
 }
 
 function OrderCard({ order, index }: { order: OrderRow; index: number }) {
+  const status = statusConfig[order.status] ?? { label: order.status, variant: 'warning' as const };
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -214,8 +223,8 @@ function OrderCard({ order, index }: { order: OrderRow; index: number }) {
             </p>
           </div>
           <div className="mt-2">
-            <NexBadge variant="success" size="sm" dot>
-              {order.status}
+            <NexBadge variant={status.variant} size="sm" dot>
+              {status.label}
             </NexBadge>
           </div>
         </div>

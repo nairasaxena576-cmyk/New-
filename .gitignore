@@ -36,3 +36,7 @@ dist/
 
 # TypeScript generated cache
 *.tsbuildinfo
+
+# Supabase CLI local link metadata (project ref, pooler URL, service versions).
+# Machine-local; never commit. supabase/migrations/ is intentionally NOT ignored.
+supabase/.temp/

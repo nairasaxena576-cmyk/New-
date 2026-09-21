@@ -28,7 +28,6 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import {
   fetchAllDeposits,
-  updateDepositStatus,
   approveDepositRpc,
   rejectDepositRpc,
   logActivity,

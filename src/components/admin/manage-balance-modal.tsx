@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import {
   Wallet,
   PlusCircle,
@@ -84,7 +83,7 @@ export function ManageBalanceModal({ open, onOpenChange, user, onAdjusted }: Man
 
   if (!user) return null;
 
-  const vipLevel = computeVipLevel(user.total_deposits);
+  const vipLevel = computeVipLevel(Number(user.balance));
   const numericAmount = parseFloat(amount) || 0;
   const currentBalance = Number(user.balance);
   const newBalance =

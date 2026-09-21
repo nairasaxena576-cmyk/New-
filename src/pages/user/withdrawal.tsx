@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Banknote,
   ArrowDownToLine,
@@ -23,7 +23,6 @@ import { NexTextarea } from '@/components/ui/nex-textarea';
 import {
   NexModal,
   NexModalContent,
-  NexModalHeader,
   NexModalFooter,
   NexModalTitle,
   NexModalDescription,
@@ -128,7 +127,10 @@ export function WithdrawalPage() {
       // Update local balance immediately
     } catch (err) {
       toast.error('Submission failed', {
-        description: err instanceof Error ? err.message : 'Please try again.',
+        description:
+          err instanceof Error && import.meta.env.DEV
+            ? err.message
+            : 'Unable to submit your withdrawal request. Please try again.',
       });
     } finally {
       setIsSubmitting(false);

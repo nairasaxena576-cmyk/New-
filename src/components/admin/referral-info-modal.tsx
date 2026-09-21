@@ -1,13 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import {
   Ticket,
   Users,
   Gift,
   TrendingUp,
   Loader2,
-  UserRound,
-  Hash,
   Crown,
 } from 'lucide-react';
 import {
@@ -28,7 +25,6 @@ import {
   type UserProfileRow,
   type ReferralRewardRow,
 } from '@/lib/supabase/deposits';
-import { cn } from '@/lib/utils';
 
 interface ReferralInfoModalProps {
   open: boolean;
@@ -79,7 +75,7 @@ export function ReferralInfoModal({ open, onOpenChange, user }: ReferralInfoModa
 
   if (!user) return null;
 
-  const vipLevel = computeVipLevel(user.total_deposits);
+  const vipLevel = computeVipLevel(Number(user.balance));
 
   return (
     <NexModal open={open} onOpenChange={onOpenChange}>
@@ -190,6 +186,33 @@ export function ReferralInfoModal({ open, onOpenChange, user }: ReferralInfoModa
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-foreground">
                           Bonus: {formatAmount(Number(r.referral_bonus))} to {r.invited_user_id.slice(0, 8)}…
+                        </p>
+                        <p className="text-muted-foreground">
+                          25% of {formatAmount(Number(r.original_reward))} · Order {r.order_number ?? '—'}
+                        </p>
+                      </div>
+                      <span className="text-muted-foreground">{formatDate(r.created_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Referral rewards received (bonuses this user earned as an invited user) */}
+            <div>
+              <h4 className="mb-2 text-sm font-semibold text-foreground">Bonuses Received ({rewardsReceived.length})</h4>
+              {rewardsReceived.length === 0 ? (
+                <p className="rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">No referral bonuses received yet.</p>
+              ) : (
+                <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-border bg-muted/20 p-2">
+                  {rewardsReceived.map((r) => (
+                    <div key={r.id} className="flex items-center gap-3 rounded-lg bg-background px-3 py-2 text-xs">
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Gift className="size-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-foreground">
+                          Bonus: {formatAmount(Number(r.referral_bonus))} from {r.inviter_id.slice(0, 8)}…
                         </p>
                         <p className="text-muted-foreground">
                           25% of {formatAmount(Number(r.original_reward))} · Order {r.order_number ?? '—'}

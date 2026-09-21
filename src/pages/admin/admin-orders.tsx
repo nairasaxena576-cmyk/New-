@@ -6,7 +6,6 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  ShoppingBag,
   Coins,
   Sparkles,
   Store,

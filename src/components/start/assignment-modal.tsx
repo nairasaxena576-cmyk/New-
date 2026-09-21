@@ -15,7 +15,6 @@ import {
 import { NexButton } from '@/components/ui/nex-button';
 import { NexBadge } from '@/components/ui/nex-badge';
 import { NexTextarea } from '@/components/ui/nex-textarea';
-import { cn } from '@/lib/utils';
 import { formatCurrency, type AssignedTask } from '@/lib/start/helpers';
 import { getVipCommissionRate } from '@/lib/vip-config';
 

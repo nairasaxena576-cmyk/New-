@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { NexCard, NexCardHeader, NexCardTitle, NexCardContent, NexBadge } from '@/components/ui/nex';
 import { NexButton } from '@/components/ui/nex-button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { fetchDashboardStats, fetchAllDeposits, fetchAllWithdrawals, fetchAllOrders, fetchAllUserProfiles, type DashboardStats, type DepositRow, type WithdrawalRow, type OrderRow, type UserProfileRow } from '@/lib/supabase/deposits';
+import { fetchDashboardStats, fetchAllDeposits, fetchAllWithdrawals, fetchAllUserProfiles, type DashboardStats, type DepositRow, type WithdrawalRow, type UserProfileRow } from '@/lib/supabase/deposits';
 import { computeVipLevel } from '@/lib/vip-config';
 import { supabase } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -46,7 +46,6 @@ export function AdminReportsPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRow[]>([]);
-  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [userProfiles, setUserProfiles] = useState<UserProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -80,16 +79,6 @@ export function AdminReportsPage() {
     }
   }, []);
 
-  const loadOrders = useCallback(async () => {
-    try {
-      const data = await fetchAllOrders();
-      setOrders(data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load orders';
-      toast.error(message);
-    }
-  }, []);
-
   const loadUserProfiles = useCallback(async () => {
     try {
       const data = await fetchAllUserProfiles();
@@ -107,7 +96,6 @@ export function AdminReportsPage() {
         loadStats(),
         loadDeposits(),
         loadWithdrawals(),
-        loadOrders(),
         loadUserProfiles(),
       ]);
       if (mounted) setLoading(false);
@@ -115,7 +103,7 @@ export function AdminReportsPage() {
     return () => {
       mounted = false;
     };
-  }, [loadStats, loadDeposits, loadWithdrawals, loadOrders, loadUserProfiles]);
+  }, [loadStats, loadDeposits, loadWithdrawals, loadUserProfiles]);
 
   // Realtime: refresh report data whenever key tables change.
   useEffect(() => {
@@ -131,14 +119,13 @@ export function AdminReportsPage() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         loadStats();
-        loadOrders();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loadStats, loadDeposits, loadWithdrawals, loadOrders]);
+  }, [loadStats, loadDeposits, loadWithdrawals]);
 
   // ---- Derived report values ----
   const approvedDepositsTotal = useMemo(
@@ -424,7 +411,7 @@ export function AdminReportsPage() {
             ) : (
               <ul className="space-y-2">
                 {topUsers.map((user, idx) => {
-                  const vipLevel = computeVipLevel(Number(user.total_deposits));
+                  const vipLevel = computeVipLevel(Number(user.balance));
                   return (
                     <motion.li
                       key={user.user_id}

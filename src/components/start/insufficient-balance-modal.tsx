@@ -4,10 +4,7 @@ import { AlertTriangle, Wallet, ArrowRight, Snowflake } from 'lucide-react';
 import {
   NexModal,
   NexModalContent,
-  NexModalHeader,
   NexModalFooter,
-  NexModalTitle,
-  NexModalDescription,
 } from '@/components/ui/nex-modal';
 import { NexButton } from '@/components/ui/nex-button';
 import { formatCurrency, type AssignedTask } from '@/lib/start/helpers';

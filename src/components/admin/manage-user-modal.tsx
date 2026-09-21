@@ -5,7 +5,6 @@ import {
   Wallet,
   Coins,
   ArrowDownRight,
-  ArrowUpRight,
   Sparkles,
   Save,
   Loader2,
@@ -112,7 +111,7 @@ export function ManageUserModal({ open, onOpenChange, user, onUpdated }: ManageU
 
   if (!user) return null;
 
-  const vipLevel = computeVipLevel(user.total_deposits);
+  const vipLevel = computeVipLevel(Number(user.balance));
   const status = user.status || 'active';
 
   const chanceNum = parseFloat(luckyChance) || 0;
@@ -144,6 +143,10 @@ export function ManageUserModal({ open, onOpenChange, user, onUpdated }: ManageU
     }
     if (dailyLimitNum < 0) {
       toast.error('Daily limit cannot be negative');
+      return;
+    }
+    if (minPriceNum != null && maxPriceNum != null && minPriceNum > maxPriceNum) {
+      toast.error('Invalid price range', { description: 'Minimum price cannot be greater than maximum price.' });
       return;
     }
     setShowConfirm(true);

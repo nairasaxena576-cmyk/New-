@@ -145,9 +145,16 @@ export function AdminWalletsPage() {
   }
 
   async function handleSubmit() {
-    if (!formData.token_name.trim() || !formData.wallet_address.trim() || !formData.network.trim()) {
+    const trimmedAddress = formData.wallet_address.trim();
+    if (!formData.token_name.trim() || !trimmedAddress || !formData.network.trim()) {
       toast.error('Required fields missing', {
         description: 'Token name, network, and wallet address are required.',
+      });
+      return;
+    }
+    if (trimmedAddress.length < 10 || /\s/.test(trimmedAddress)) {
+      toast.error('Wallet address looks invalid', {
+        description: 'Double-check the address — it looks too short or contains whitespace. Customers will send funds here.',
       });
       return;
     }

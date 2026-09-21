@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Rocket, Lock, Search, ShieldAlert, Headphones, Wallet, AlertTriangle } from 'lucide-react';
@@ -103,6 +103,11 @@ export function StartPage() {
 
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<Phase>('idle');
+  const sendingRef = useRef(false);
+  // Tracks the real RPC outcome so the success animation only shows once the
+  // request has actually resolved — see handleSend/handleSubmitComplete.
+  const submitOutcomeRef = useRef<'pending' | 'success' | 'handled'>('pending');
+  const overlayElapsedRef = useRef(false);
   const [task, setTask] = useState<AssignedTask | null>(null);
   const [note, setNote] = useState('');
   const [dbProducts, setDbProducts] = useState<ProductRow[]>([]);
@@ -151,10 +156,8 @@ export function StartPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    const t = setTimeout(() => setLoading(false), 1200);
     return () => {
       cancelled = true;
-      clearTimeout(t);
     };
   }, []);
 
@@ -225,6 +228,10 @@ export function StartPage() {
 
   function handleSend() {
     if (!user || !task) return;
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    submitOutcomeRef.current = 'pending';
+    overlayElapsedRef.current = false;
 
     setPhase('submitting');
     setSubmitError(null);
@@ -258,6 +265,8 @@ export function StartPage() {
           });
           await refreshUserData();
           clearPending();
+          submitOutcomeRef.current = 'success';
+          if (overlayElapsedRef.current) setPhase('success');
         } else {
           const result = await submitOrderRpc({
             p_user_id: user.id,
@@ -282,9 +291,12 @@ export function StartPage() {
             setPendingTask(task);
             savePendingTask(task);
             sessionStorage.setItem(PENDING_NOTE_KEY, note);
+            submitOutcomeRef.current = 'handled';
             setPhase('insufficient');
           } else {
             clearPending();
+            submitOutcomeRef.current = 'success';
+            if (overlayElapsedRef.current) setPhase('success');
           }
         }
       } catch (err) {
@@ -293,13 +305,23 @@ export function StartPage() {
           console.error('[submitOrderRpc] error:', message);
         }
         setSubmitError(message);
+        submitOutcomeRef.current = 'handled';
         setPhase('review');
+      } finally {
+        sendingRef.current = false;
       }
     })();
   }
 
+  // Called when the minimum "processing" animation duration elapses. The
+  // actual RPC may still be in flight (slow connection) — only advance to
+  // 'success' once we know that's the real outcome; otherwise wait for the
+  // RPC to resolve and let handleSend's own branches transition the phase.
   function handleSubmitComplete() {
-    setPhase('success');
+    overlayElapsedRef.current = true;
+    if (submitOutcomeRef.current === 'success') {
+      setPhase('success');
+    }
   }
 
   function reset() {

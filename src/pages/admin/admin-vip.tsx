@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Crown, Plus, Save, Trash2, Loader2, AlertTriangle, Star } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
-import { NexCard, NexCardHeader, NexCardTitle, NexCardContent, NexCardFooter, NexBadge, NexButton } from '@/components/ui/nex';
+import { NexCard, NexCardHeader, NexCardContent, NexCardFooter, NexBadge, NexButton } from '@/components/ui/nex';
 import { NexInput } from '@/components/ui/nex-input';
 import { NexModal, NexModalContent, NexModalHeader, NexModalFooter, NexModalTitle, NexModalDescription } from '@/components/ui/nex-modal';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -159,6 +159,10 @@ export function AdminVipPage() {
       toast.error('Tier name is required');
       return;
     }
+    if (Number(draft.daily_order_limit) < 0 || Number(draft.commission_rate) < 0 || Number(draft.min_deposit) < 0) {
+      toast.error('Values cannot be negative', { description: 'Daily limit, commission rate, and min deposit must be zero or greater.' });
+      return;
+    }
     setSavingLevel(row.level);
     try {
       const updates: Partial<VipConfigRow> = {
@@ -192,6 +196,10 @@ export function AdminVipPage() {
     }
     if (tiers.some((t) => t.level === newTier.level)) {
       toast.error(`Level ${newTier.level} already exists`, { description: 'Choose a unique VIP level number.' });
+      return;
+    }
+    if (Number(newTier.daily_order_limit) < 0 || Number(newTier.commission_rate) < 0 || Number(newTier.min_deposit) < 0) {
+      toast.error('Values cannot be negative', { description: 'Daily limit, commission rate, and min deposit must be zero or greater.' });
       return;
     }
     setAdding(true);

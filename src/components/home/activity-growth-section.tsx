@@ -7,7 +7,6 @@ import {
   ArrowUpFromLine,
   ClipboardList,
   Headphones,
-  Crown,
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
@@ -17,11 +16,9 @@ import {
   fetchWithdrawals,
   fetchUserTickets,
   type OrderRow,
-  type DepositRow,
   type WithdrawalRow,
   type SupportTicketRow,
 } from '@/lib/supabase/deposits';
-import { supabase } from '@/lib/supabase/client';
 
 interface ActivityItem {
   id: string;
@@ -52,6 +49,7 @@ export function ActivityGrowthSection() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRow[]>([]);
   const [tickets, setTickets] = useState<SupportTicketRow[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -67,6 +65,8 @@ export function ActivityGrowthSection() {
         setTickets(t);
       } catch {
         // keep empty
+      } finally {
+        setLoadingActivity(false);
       }
     })();
   }, [user]);
@@ -167,7 +167,19 @@ export function ActivityGrowthSection() {
           </button>
         </div>
 
-        {activities.length === 0 ? (
+        {loadingActivity ? (
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3 rounded-xl px-2 py-2.5">
+                <div className="size-9 shrink-0 animate-pulse rounded-lg bg-slate-100" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="h-3.5 w-3/5 animate-pulse rounded bg-slate-100" />
+                  <div className="h-3 w-2/5 animate-pulse rounded bg-slate-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : activities.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
               <ClipboardList className="size-6" />

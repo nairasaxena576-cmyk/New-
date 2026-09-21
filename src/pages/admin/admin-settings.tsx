@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Info, Wallet, Crown, Megaphone, AlertTriangle, ArrowRight, Loader2, Database, Shield, Zap } from 'lucide-react';
+import { Settings, Wallet, Crown, Megaphone, AlertTriangle, ArrowRight, Loader2, Database, Shield, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/page-header';
 import { NexCard, NexCardHeader, NexCardTitle, NexCardDescription, NexCardContent, NexBadge } from '@/components/ui/nex';

@@ -11,7 +11,6 @@ import {
   UserRound,
   Flag,
   StickyNote,
-  XCircle,
   Pencil,
   X,
   Save,
@@ -140,6 +139,7 @@ export function AdminTicketsPage() {
       setMessages([]);
       return;
     }
+    setMessages([]);
     fetchTicketMessagesAdmin(selected.id)
       .then(setMessages)
       .catch(() => toast.error('Unable to load conversation'));

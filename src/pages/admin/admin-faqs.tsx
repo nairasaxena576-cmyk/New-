@@ -43,13 +43,16 @@ export function AdminFaqsPage() {
   const [sortOrder, setSortOrder] = useState(0);
   const [isActive, setIsActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function loadFaqs() {
     try {
       const rows = await fetchAllFaqs();
       setFaqs(rows);
-    } catch {
-      // keep empty
+    } catch (err) {
+      toast.error('Failed to load FAQs', {
+        description: err instanceof Error ? err.message : 'Please try again.',
+      });
     } finally {
       setLoading(false);
     }
@@ -115,6 +118,8 @@ export function AdminFaqsPage() {
   }
 
   async function handleDelete(id: string) {
+    if (busyId) return;
+    setBusyId(id);
     try {
       await deleteFaq(id);
       toast.success('FAQ deleted');
@@ -123,15 +128,21 @@ export function AdminFaqsPage() {
       toast.error('Failed to delete', {
         description: err instanceof Error ? err.message : 'Please try again.',
       });
+    } finally {
+      setBusyId(null);
     }
   }
 
   async function toggleActive(faq: FaqRow) {
+    if (busyId) return;
+    setBusyId(faq.id);
     try {
       await updateFaq(faq.id, { is_active: !faq.is_active });
       await loadFaqs();
     } catch {
       toast.error('Failed to update');
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -262,22 +273,25 @@ export function AdminFaqsPage() {
                   <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => toggleActive(faq)}
-                      className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"
+                      disabled={busyId === faq.id}
+                      className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
                       title={faq.is_active ? 'Hide' : 'Show'}
                     >
-                      <Check className="size-4" />
+                      {busyId === faq.id ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                     </button>
                     <button
                       onClick={() => startEdit(faq)}
-                      className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"
+                      disabled={busyId === faq.id}
+                      className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
                     >
                       <Pencil className="size-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(faq.id)}
-                      className="flex size-8 items-center justify-center rounded-lg border border-danger/20 text-danger transition-colors hover:bg-danger/10"
+                      disabled={busyId === faq.id}
+                      className="flex size-8 items-center justify-center rounded-lg border border-danger/20 text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
                     >
-                      <Trash2 className="size-4" />
+                      {busyId === faq.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
                     </button>
                   </div>
                 </div>
