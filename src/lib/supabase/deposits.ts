@@ -232,8 +232,15 @@ export async function ensureUserProfile(input: {
   email: string;
   full_name: string;
   phone: string;
+  /** Required registration-gate code, validated + atomically consumed
+   * server-side against `invitation_codes`. Distinct from `referrer_code`. */
   invitation_code?: string;
+  /** This new user's own shareable code (unrelated to who invited them). */
   referral_code?: string;
+  /** Optional: an existing user's `referral_code`, used only to attribute
+   * `inviter_id`. Never validated as a gate — an unmatched value simply
+   * results in no inviter being credited. */
+  referrer_code?: string;
 }): Promise<UserProfileRow | null> {
   // Use the SECURITY DEFINER RPC to create the profile — this bypasses RLS
   // so it works even if the session isn't fully established yet after signUp
@@ -245,6 +252,7 @@ export async function ensureUserProfile(input: {
       p_phone: input.phone,
       p_invitation_code: input.invitation_code ?? '',
       p_referral_code: input.referral_code ?? '',
+      p_referrer_code: input.referrer_code ?? '',
     })
     .maybeSingle();
   if (error) {

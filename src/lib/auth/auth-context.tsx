@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { UserProfile, UserRole, VipLevel } from './types';
+import type { User } from '@supabase/supabase-js';
+import type { UserProfile, UserRole, VipLevel, RegisterResult } from './types';
 import {
   fetchDeposits,
   fetchUserProfile,
@@ -37,8 +38,14 @@ interface AuthContextValue {
     email: string;
     phone: string;
     password: string;
+    /** Required registration-gate code, validated server-side. */
     invitationCode: string;
-  }) => Promise<UserProfile>;
+    /** Optional: an existing user's shareable referral code, for inviter
+     * attribution only — never a gate. */
+    referrerCode?: string;
+  }) => Promise<RegisterResult>;
+  /** Re-sends the signup confirmation email (Confirm-email-ON flow only). */
+  resendConfirmation: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   redirectAfterAuth: () => string;
   hasRole: (role: UserRole) => boolean;
@@ -80,44 +87,11 @@ function rowToProfile(row: UserProfileRow): UserProfile {
   };
 }
 
-function fallbackProfile(
-  id: string,
-  email: string,
-  fullName: string,
-  phone: string,
-  invitationCode: string
-): UserProfile {
-  const dailyOrderLimit = getVipDailyOrderLimit(0);
-  return {
-    id,
-    fullName,
-    email,
-    phone,
-    role: 'user',
-    vipLevel: 0,
-    totalDeposits: 0,
-    balance: 0,
-    frozenAmount: 0,
-    pendingShortage: 0,
-    lifetimeCommission: 0,
-    todayCommission: 0,
-    dailyTaskLimit: dailyOrderLimit,
-    completedToday: 0,
-    referralCode: '',
-    referredBy: invitationCode || null,
-    inviterId: null,
-    totalReferralEarned: 0,
-    totalReferralGiven: 0,
-    avatar: '',
-    status: 'active',
-    createdAt: new Date().toISOString(),
-    startAccessEnabled: true,
-    startAccessBlockMessage: null,
-  };
-}
-
 function friendlyAuthError(message: string): string {
   const msg = message.toLowerCase();
+  if (msg.includes('email not confirmed') || msg.includes('email_not_confirmed')) {
+    return 'Please confirm your email address before signing in — check your inbox for the confirmation link we sent you.';
+  }
   if (msg.includes('invalid login credentials')) {
     return 'Invalid email or password. Please check your credentials and try again.';
   }
@@ -137,6 +111,117 @@ function friendlyAuthError(message: string): string {
     return 'Unable to connect to the authentication service. Please check your internet connection.';
   }
   return message;
+}
+
+/** Reads a string field out of Supabase auth user_metadata, never throwing
+ * on an unexpected shape. */
+function metaString(meta: Record<string, unknown> | undefined, key: string): string {
+  const v = meta?.[key];
+  return typeof v === 'string' ? v : '';
+}
+
+function makeReferralCode(seed: string): string {
+  return (
+    'NEX-' +
+    seed.replace(/\s/g, '').slice(0, 5).toUpperCase() +
+    Math.floor(Math.random() * 90 + 10)
+  );
+}
+
+/**
+ * Known, deliberately-written `RAISE EXCEPTION` messages from
+ * `create_user_profile` that are already safe and specific enough to show
+ * a user as-is (in production, not just DEV) — distinct from an arbitrary
+ * Postgres/RPC failure, which must stay generic in production.
+ */
+const KNOWN_SETUP_ERROR_MESSAGES: Record<string, string> = {
+  'invitation code is required': 'An invitation code is required to create an account.',
+  'invalid or already-used invitation code': 'That invitation code is invalid or has already been used.',
+};
+
+/** Wraps a profile-setup failure so real Postgres/RPC detail never reaches
+ * production users, while staying fully visible in development. Known,
+ * user-actionable RPC errors (e.g. a bad invitation code) still surface
+ * their specific message in production. */
+function accountSetupError(err: unknown): Error {
+  const detail = err instanceof Error ? err.message : String(err);
+  const lower = detail.toLowerCase();
+  const known = Object.entries(KNOWN_SETUP_ERROR_MESSAGES).find(([needle]) => lower.includes(needle));
+  if (known) return new Error(known[1]);
+
+  return new Error(
+    import.meta.env.DEV
+      ? `Account setup failed: ${detail}`
+      : 'We could not finish setting up your account. Please try again or contact support.'
+  );
+}
+
+/**
+ * Ensures a `user_profiles` row exists for an authenticated Supabase user,
+ * then unconditionally (re-)attempts the existing race-safe
+ * `assign_first_admin_if_needed` bootstrap.
+ *
+ * The profile itself is only ever created once — if a row already exists it
+ * is returned as-is and never recreated or modified. The admin-bootstrap
+ * call, however, runs on every invocation (every login / session restore),
+ * not just the first time a profile is created. This is deliberate: it lets
+ * a transient failure during the very first registration (network blip,
+ * momentary DB issue) recover itself on the user's next authenticated
+ * session, without ever touching the profile row again. It's safe to call
+ * repeatedly because `assign_first_admin_if_needed` is already race-safe
+ * (advisory lock) and a no-op once any admin exists — it does not raise for
+ * that case, only for a genuine authorization/database failure.
+ *
+ * `user` MUST come from an authenticated Supabase session (supabase.auth.*)
+ * — never from a URL parameter or other client-supplied value — so that the
+ * RPCs' own `auth.uid() = p_user_id` check is meaningful. Registration form
+ * data (full name / phone / invitation code) is recovered from the user's
+ * `user_metadata`, which Supabase carries through from signUp() to the
+ * confirmed session even across a different tab/device — never trusted from
+ * anything else.
+ */
+async function completeUserProfile(user: User): Promise<UserProfileRow> {
+  let profile = await fetchUserProfile(user.id);
+
+  if (!profile) {
+    const meta = user.user_metadata as Record<string, unknown> | undefined;
+    const fullName = metaString(meta, 'full_name');
+
+    try {
+      profile = await ensureUserProfile({
+        user_id: user.id,
+        email: user.email ?? '',
+        full_name: fullName,
+        phone: metaString(meta, 'phone'),
+        // Required registration gate, validated + consumed server-side.
+        invitation_code: metaString(meta, 'invitation_code'),
+        // This user's own new shareable code — unrelated to who invited them.
+        referral_code: makeReferralCode(fullName || (user.email ?? 'user')),
+        // Optional: an existing user's referral_code, for inviter attribution
+        // only. Never validated as a gate.
+        referrer_code: metaString(meta, 'referrer_code'),
+      });
+    } catch (err) {
+      throw accountSetupError(err);
+    }
+    if (!profile) throw accountSetupError('Profile creation returned no data');
+  }
+
+  // First-user-is-admin bootstrap. Runs whether the profile was just
+  // created or already existed — never fatal, since the profile row is
+  // already in hand either way, but never silently invisible either, in
+  // case a failure signals a real authorization/database problem rather
+  // than "an admin already exists" (which this RPC handles internally and
+  // never raises for).
+  try {
+    await supabase.rpc('assign_first_admin_if_needed', { p_user_id: user.id });
+  } catch (err) {
+    console.error('assign_first_admin_if_needed failed (non-fatal):', err);
+    return profile;
+  }
+
+  const refreshed = await fetchUserProfile(user.id);
+  return refreshed ?? profile;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -210,6 +295,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Ensures the profile/admin-bootstrap exist, then loads full state.
+  // Used for every point a real session appears: initial page load, a
+  // normal token refresh, AND landing back on /login after clicking the
+  // email-confirmation link (that link resolves to an authenticated
+  // session via Supabase's own detectSessionInUrl handling — no manual
+  // token/query parsing is done here or anywhere else in this file).
+  const establishSession = useCallback(
+    async (user: User) => {
+      try {
+        await completeUserProfile(user);
+      } catch (err) {
+        // Don't crash session restoration over this — loadUserData below
+        // already has its own derived-fallback path for "no profile yet",
+        // and the real error is still visible in the console for diagnosis.
+        console.error('completeUserProfile failed:', err);
+      }
+      await loadUserData(user.id, user.email ?? '');
+    },
+    [loadUserData]
+  );
+
   // Restore session on mount + listen for auth changes
   useEffect(() => {
     let mounted = true;
@@ -218,7 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
       if (session?.user) {
-        await loadUserData(session.user.id, session.user.email ?? '');
+        await establishSession(session.user);
       } else {
         setIsLoading(false);
       }
@@ -228,7 +334,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (_event, session) => {
         (async () => {
           if (session?.user) {
-            await loadUserData(session.user.id, session.user.email ?? '');
+            await establishSession(session.user);
           } else {
             setUser(null);
             setDeposits([]);
@@ -242,7 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [loadUserData]);
+  }, [establishSession]);
 
   // Realtime: update when deposits OR user_profiles change
   useEffect(() => {
@@ -282,27 +388,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authUser = data.user;
       if (!authUser) throw new Error('Login failed — no user returned');
 
-      const dbProfile = await fetchUserProfile(authUser.id);
-      if (dbProfile) {
-        setUser(rowToProfile(dbProfile));
-        return rowToProfile(dbProfile);
-      }
-
-      // Profile missing — create it now from the auth user's data
-      const newProfile = await ensureUserProfile({
-        user_id: authUser.id,
-        email: authUser.email ?? email,
-        full_name: '',
-        phone: '',
-      });
-      if (newProfile) {
-        setUser(rowToProfile(newProfile));
-        return rowToProfile(newProfile);
-      }
-
-      const fallback = fallbackProfile(authUser.id, authUser.email ?? email, '', '', '');
-      setUser(fallback);
-      return fallback;
+      // Handles the normal case (profile already exists) in a single read,
+      // and also finishes setup for the rare case where an earlier signup
+      // never completed its profile/admin-bootstrap step.
+      const profile = await completeUserProfile(authUser);
+      const finalProfile = rowToProfile(profile);
+      setUser(finalProfile);
+      return finalProfile;
     },
     []
   );
@@ -314,66 +406,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone: string;
       password: string;
       invitationCode: string;
-    }) => {
+      referrerCode?: string;
+    }): Promise<RegisterResult> => {
       const emailClean = input.email.toLowerCase().trim();
+      const fullName = input.fullName.trim();
+      const invitationCode = input.invitationCode.trim();
+      const referrerCode = (input.referrerCode ?? '').trim();
+
       const { data, error } = await supabase.auth.signUp({
         email: emailClean,
         password: input.password,
+        options: {
+          // Carried through by Supabase onto auth.users.user_metadata and
+          // present on session.user once the confirmation link is clicked
+          // (possibly in a different tab/device) — this is how the deferred
+          // profile-completion step recovers the form data without trusting
+          // anything supplied via a URL parameter. invitation_code is the
+          // required registration gate; referrer_code is a separate,
+          // optional field used only for inviter attribution.
+          data: {
+            full_name: fullName,
+            phone: input.phone,
+            invitation_code: invitationCode,
+            referrer_code: referrerCode,
+          },
+          emailRedirectTo: `${window.location.origin}/login`,
+        },
       });
       if (error) throw new Error(friendlyAuthError(error.message));
       const authUser = data.user;
       if (!authUser) throw new Error('Registration failed — no user returned');
 
-      const referralCode =
-        'NEX-' +
-        input.fullName.replace(/\s/g, '').slice(0, 5).toUpperCase() +
-        Math.floor(Math.random() * 90 + 10);
-
-      // Create the complete profile row via SECURITY DEFINER RPC
-      // This bypasses RLS so it works even if the session isn't established yet
-      let profile: UserProfileRow | null = null;
-      try {
-        profile = await ensureUserProfile({
-          user_id: authUser.id,
-          email: emailClean,
-          full_name: input.fullName.trim(),
-          phone: input.phone,
-          invitation_code: input.invitationCode.trim(),
-          referral_code: referralCode,
-        });
-      } catch (profileErr) {
-        // If the RPC fails, the auth account was still created — surface the real error
-        throw new Error(
-          profileErr instanceof Error
-            ? profileErr.message
-            : `Profile creation failed: ${String(profileErr)}`
-        );
+      if (!data.session) {
+        // Confirm-email is ON: no session yet. create_user_profile and
+        // assign_first_admin_if_needed are (correctly) restricted to the
+        // `authenticated` role, so they must NOT be called as anon here —
+        // both run later, once a real session exists (see establishSession
+        // above, which fires when the user clicks the confirmation link).
+        return { kind: 'pending_confirmation', email: emailClean };
       }
 
-      // Promote to admin if no admin exists yet (first-user-is-admin)
-      try {
-        await supabase.rpc('assign_first_admin_if_needed', {
-          p_user_id: authUser.id,
-        });
-      } catch {
-        // Non-fatal — user stays as 'user'
-      }
-
-      // Re-fetch to get the final profile (possibly with admin role)
-      if (profile?.role !== 'admin') {
-        const refreshed = await fetchUserProfile(authUser.id);
-        if (refreshed) profile = refreshed;
-      }
-
-      const finalProfile = profile
-        ? rowToProfile(profile)
-        : fallbackProfile(authUser.id, emailClean, input.fullName, input.phone, input.invitationCode);
+      // Confirm-email is OFF (or this account was already confirmed):
+      // signUp() returned a live session immediately, so finish setup now.
+      const profile = await completeUserProfile(authUser);
+      const finalProfile = rowToProfile(profile);
       setUser(finalProfile);
       setDeposits([]);
       return finalProfile;
     },
     []
   );
+
+  const resendConfirmation = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.toLowerCase().trim(),
+      options: { emailRedirectTo: `${window.location.origin}/login` },
+    });
+    if (error) throw new Error(friendlyAuthError(error.message));
+  }, []);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
@@ -398,12 +489,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deposits,
       login,
       register,
+      resendConfirmation,
       logout,
       redirectAfterAuth,
       hasRole,
       refreshUserData,
     }),
-    [user, isLoading, deposits, login, register, logout, redirectAfterAuth, hasRole, refreshUserData]
+    [
+      user,
+      isLoading,
+      deposits,
+      login,
+      register,
+      resendConfirmation,
+      logout,
+      redirectAfterAuth,
+      hasRole,
+      refreshUserData,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

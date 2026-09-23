@@ -28,3 +28,18 @@ export interface UserProfile {
   startAccessEnabled: boolean;
   startAccessBlockMessage: string | null;
 }
+
+/**
+ * Returned by `register()` when Supabase Auth requires email confirmation
+ * (signUp() succeeded but returned no session yet). No profile has been
+ * created and no admin-bootstrap attempt has been made at this point —
+ * both happen later, once a real authenticated session exists.
+ */
+export interface RegistrationPending {
+  kind: 'pending_confirmation';
+  email: string;
+}
+
+/** Result of `register()`: either the account is fully set up, or email
+ * confirmation is still pending. */
+export type RegisterResult = UserProfile | RegistrationPending;

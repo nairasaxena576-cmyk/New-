@@ -11,6 +11,7 @@ import {
   EyeOff,
   AlertCircle,
   Ticket,
+  Gift,
   CheckCircle2,
   PartyPopper,
 } from 'lucide-react';
@@ -49,7 +50,7 @@ interface FieldErrors {
 }
 
 export function RegisterPage() {
-  const { register } = useAuth();
+  const { register, resendConfirmation } = useAuth();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -59,6 +60,7 @@ export function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [invitationCode, setInvitationCode] = useState('');
+  const [referrerCode, setReferrerCode] = useState('');
   const [agreedTerms, setAgreedTerms] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -66,7 +68,13 @@ export function RegisterPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [outcome, setOutcome] = useState<
+    | { kind: 'idle' }
+    | { kind: 'confirmed'; firstName: string }
+    | { kind: 'pending_confirmation'; email: string }
+  >({ kind: 'idle' });
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [resendError, setResendError] = useState('');
 
   function validate(): boolean {
     const next: FieldErrors = {};
@@ -97,16 +105,24 @@ export function RegisterPage() {
     setIsSubmitting(true);
     try {
       const fullPhone = `${countryCode} ${phone}`.trim();
-      const profile = await register({
+      const result = await register({
         fullName,
         email,
         phone: fullPhone,
         password,
         invitationCode,
+        referrerCode,
       });
-      setSuccess(true);
+
+      if ('kind' in result) {
+        setOutcome({ kind: 'pending_confirmation', email: result.email });
+        return;
+      }
+
+      const firstName = result.fullName.split(' ')[0];
+      setOutcome({ kind: 'confirmed', firstName });
       toast.success('Account created!', {
-        description: `Welcome to Hawksem, ${profile.fullName.split(' ')[0]}`,
+        description: `Welcome to Hawksem, ${firstName}`,
       });
       // Brief success state, then redirect
       setTimeout(() => {
@@ -126,7 +142,22 @@ export function RegisterPage() {
     }
   }
 
-  if (success) {
+  async function handleResend() {
+    if (outcome.kind !== 'pending_confirmation') return;
+    setResendState('sending');
+    setResendError('');
+    try {
+      await resendConfirmation(outcome.email);
+      setResendState('sent');
+    } catch (err) {
+      setResendState('idle');
+      setResendError(
+        err instanceof Error ? err.message : 'Unable to resend the confirmation email. Please try again.'
+      );
+    }
+  }
+
+  if (outcome.kind === 'confirmed') {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -152,6 +183,61 @@ export function RegisterPage() {
             <div className="mt-6 flex items-center gap-2 text-sm font-medium text-primary">
               <span className="size-2 animate-pulse rounded-full bg-primary" />
               Redirecting…
+            </div>
+          </div>
+        </NexCard>
+      </motion.div>
+    );
+  }
+
+  if (outcome.kind === 'pending_confirmation') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+      >
+        <NexCard className="overflow-hidden">
+          <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="mb-5 flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-white shadow-[0_8px_24px_-4px_hsl(var(--primary)/0.5)]">
+              <Mail className="size-9" />
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">
+              Check your email
+            </h2>
+            <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">
+              We've sent a confirmation link to{' '}
+              <span className="font-semibold text-foreground">{outcome.email}</span>. Confirm
+              your email to activate your Hawksem account.
+            </p>
+
+            <AnimatePresence>
+              {resendError && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-4 text-xs font-medium text-danger"
+                >
+                  {resendError}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <div className="mt-6 flex w-full flex-col gap-2.5">
+              <NexButton
+                type="button"
+                variant="outline"
+                className="w-full"
+                isLoading={resendState === 'sending'}
+                disabled={resendState === 'sent'}
+                onClick={handleResend}
+              >
+                {resendState === 'sent' ? 'Email sent — check your inbox' : 'Resend confirmation email'}
+              </NexButton>
+              <NexButton type="button" className="w-full" onClick={() => navigate('/login')}>
+                Back to sign in
+              </NexButton>
             </div>
           </div>
         </NexCard>
@@ -388,6 +474,22 @@ export function RegisterPage() {
             {errors.invitationCode && (
               <p className="text-xs font-medium text-danger">{errors.invitationCode}</p>
             )}
+          </div>
+
+          {/* Referral code — optional, attribution only, never a gate */}
+          <div className="space-y-1.5">
+            <label htmlFor="referrerCode" className="text-sm font-semibold text-foreground">
+              Referral code
+              <span className="ml-1.5 text-xs font-medium text-muted-foreground">(optional)</span>
+            </label>
+            <NexInput
+              id="referrerCode"
+              type="text"
+              placeholder="A friend's referral code"
+              leftIcon={<Gift />}
+              value={referrerCode}
+              onChange={(e) => setReferrerCode(e.target.value.toUpperCase())}
+            />
           </div>
 
           {/* Terms checkbox */}
