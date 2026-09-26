@@ -15,6 +15,7 @@ import { ServicePage } from '@/pages/user/service';
 import { AccountPage } from '@/pages/user/account';
 import { AdminDashboard } from '@/pages/admin/admin-dashboard';
 import { AdminUsersPage } from '@/pages/admin/admin-users';
+import { AdminInvitationsPage } from '@/pages/admin/admin-invitations';
 import { AdminDepositsPage } from '@/pages/admin/admin-deposits';
 import { AdminWithdrawalsPage } from '@/pages/admin/admin-withdrawals';
 import { AdminOrdersPage } from '@/pages/admin/admin-orders';
@@ -78,6 +79,7 @@ function App() {
           >
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/invitations" element={<AdminInvitationsPage />} />
             <Route path="/admin/deposits" element={<AdminDepositsPage />} />
             <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
             <Route path="/admin/orders" element={<AdminOrdersPage />} />

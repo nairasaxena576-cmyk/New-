@@ -8,13 +8,13 @@ import {
   type ReactNode,
 } from 'react';
 import type { User } from '@supabase/supabase-js';
+import { AlertTriangle } from 'lucide-react';
 import type { UserProfile, UserRole, VipLevel, RegisterResult } from './types';
 import {
   fetchDeposits,
   fetchUserProfile,
   ensureUserProfile,
   computeDerivedVip,
-  sumApprovedDeposits,
   fetchVipConfig,
   type DepositRow,
   type UserProfileRow,
@@ -26,6 +26,8 @@ import {
   getVipDailyOrderLimit,
   setRuntimeVipConfig,
 } from '@/lib/vip-config';
+import { NexCard } from '@/components/ui/nex';
+import { NexButton } from '@/components/ui/nex-button';
 
 interface AuthContextValue {
   user: UserProfile | null;
@@ -224,10 +226,53 @@ async function completeUserProfile(user: User): Promise<UserProfileRow> {
   return refreshed ?? profile;
 }
 
+/**
+ * Shown instead of the normal app when a real Supabase Auth session exists
+ * but the required `user_profiles` row could not be loaded/created —
+ * see `establishSession`. Never rendered alongside a phantom/fake profile;
+ * the Supabase session itself is left intact so "Try again" can reuse it.
+ */
+function AuthErrorScreen({
+  message,
+  onRetry,
+  onSignOut,
+}: {
+  message: string;
+  onRetry: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-6">
+      <NexCard className="w-full max-w-sm p-6 text-center">
+        <div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-danger/10 text-danger">
+          <AlertTriangle className="size-8" />
+        </div>
+        <h1 className="text-lg font-bold tracking-tight text-foreground">
+          Account setup problem
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{message}</p>
+        <div className="mt-6 flex flex-col gap-2.5">
+          <NexButton className="w-full" onClick={onRetry}>
+            Try again
+          </NexButton>
+          <NexButton variant="outline" className="w-full" onClick={onSignOut}>
+            Sign out
+          </NexButton>
+        </div>
+      </NexCard>
+    </div>
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [deposits, setDeposits] = useState<DepositRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Set only when a real Auth session exists but its profile could not be
+  // loaded/created — see establishSession. While set, AuthProvider renders
+  // AuthErrorScreen instead of the app, so no phantom profile can ever be
+  // reached by a route.
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -250,46 +295,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const loadUserData = useCallback(async (userId: string, email: string) => {
+  const loadUserData = useCallback(async (userId: string) => {
     try {
       const [rows, profile] = await Promise.all([
         fetchDeposits(userId),
         fetchUserProfile(userId),
       ]);
       setDeposits(rows);
-      if (profile) {
-        setUser(rowToProfile(profile));
-      } else {
-        // Profile row not yet created — derive from deposits
-        const total = sumApprovedDeposits(rows);
-        const { vipLevel, dailyOrderLimit } = computeDerivedVip(0);
-        setUser((prev) => ({
-          id: userId,
-          fullName: prev?.fullName ?? email,
-          email: prev?.email ?? email,
-          phone: prev?.phone ?? '',
-          role: prev?.role ?? 'user',
-          vipLevel: vipLevel as VipLevel,
-          totalDeposits: total,
-          balance: 0,
-          frozenAmount: 0,
-          pendingShortage: 0,
-          lifetimeCommission: 0,
-          todayCommission: 0,
-          dailyTaskLimit: dailyOrderLimit,
-          completedToday: 0,
-          referralCode: '',
-          referredBy: prev?.referredBy ?? null,
-          inviterId: null,
-          totalReferralEarned: 0,
-          totalReferralGiven: 0,
-          avatar: '',
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          startAccessEnabled: true,
-          startAccessBlockMessage: null,
-        }));
-      }
+      // No fabricated fallback profile: if no real row exists, this user is
+      // not treated as authenticated. A profile-less session reaching this
+      // point (rather than being caught earlier by establishSession) is
+      // never papered over with fake data.
+      setUser(profile ? rowToProfile(profile) : null);
     } catch {
       // keep existing user state
     }
@@ -301,17 +318,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // email-confirmation link (that link resolves to an authenticated
   // session via Supabase's own detectSessionInUrl handling — no manual
   // token/query parsing is done here or anywhere else in this file).
+  //
+  // If completeUserProfile fails, this must NOT fall through to
+  // loadUserData: a real Supabase Auth session with no usable profile is
+  // not a normal authenticated state. Instead it sets authError, which
+  // makes AuthProvider render AuthErrorScreen in place of the whole app —
+  // no route, protected or not, can render with a phantom/fabricated
+  // profile. The underlying Supabase session is left untouched (not signed
+  // out), so "Try again" can retry against the same session.
   const establishSession = useCallback(
     async (user: User) => {
       try {
         await completeUserProfile(user);
+        setAuthError(null);
       } catch (err) {
-        // Don't crash session restoration over this — loadUserData below
-        // already has its own derived-fallback path for "no profile yet",
-        // and the real error is still visible in the console for diagnosis.
         console.error('completeUserProfile failed:', err);
+        // Reuse accountSetupError's DEV/PROD-safe mapping even though this
+        // err may not have passed through it already — completeUserProfile's
+        // own fetchUserProfile() call isn't wrapped, so a raw Postgrest
+        // error could otherwise reach here unsanitized.
+        setAuthError(accountSetupError(err).message);
+        setIsLoading(false);
+        return;
       }
-      await loadUserData(user.id, user.email ?? '');
+      await loadUserData(user.id);
     },
     [loadUserData]
   );
@@ -375,7 +405,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUserData = useCallback(async () => {
     if (!user) return;
-    await loadUserData(user.id, user.email);
+    await loadUserData(user.id);
   }, [user, loadUserData]);
 
   const login = useCallback(
@@ -470,6 +500,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setDeposits([]);
+    setAuthError(null);
   }, []);
 
   const redirectAfterAuth = useCallback(() => {
@@ -508,6 +539,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshUserData,
     ]
   );
+
+  // A real Auth session exists but its profile couldn't be loaded/created —
+  // render the recovery screen in place of the entire app, so no route
+  // (protected or otherwise) can ever be reached with a fabricated profile.
+  if (authError) {
+    return (
+      <AuthErrorScreen
+        message={authError}
+        onRetry={() => window.location.reload()}
+        onSignOut={() => {
+          void logout();
+        }}
+      />
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

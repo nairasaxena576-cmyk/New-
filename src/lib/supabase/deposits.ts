@@ -224,7 +224,16 @@ export async function fetchUserProfile(userId: string): Promise<UserProfileRow |
     .rpc('get_user_profile_safe', { p_user_id: userId })
     .maybeSingle();
   if (error) throw error;
-  return (data as UserProfileRow) ?? null;
+  // get_user_profile_safe is RETURNS user_profiles (a single composite type,
+  // not SETOF/TABLE). When no row exists it does `RETURN NULL`, but
+  // PostgREST's `SELECT * FROM func()` execution expands that composite
+  // NULL into one row with every column set to null, rather than zero
+  // rows — so `data` here is a truthy object ({ user_id: null, ... }), not
+  // JS null/undefined, even when no profile exists. user_id is the primary
+  // key and can never be null on a real row, so gate on it explicitly
+  // instead of trusting data's outer truthiness.
+  const row = data as UserProfileRow | null;
+  return row && row.user_id ? row : null;
 }
 
 export async function ensureUserProfile(input: {
@@ -1159,4 +1168,36 @@ export async function adminSetStartAccess(adminId: string, userId: string, enabl
     p_block_message: blockMessage ?? null,
   });
   if (error) throw error;
+}
+
+// ============ Admin: Invitation Codes ============
+// invitation_codes has no direct table grants for anon/authenticated —
+// every read/write here goes through the two admin-only SECURITY DEFINER
+// RPCs (admin_list_invitation_codes / admin_generate_invitation_code).
+// There is deliberately no update/delete helper: codes are not editable.
+
+export interface InvitationCodeRow {
+  code: string;
+  created_by: string | null;
+  created_at: string;
+  used_by: string | null;
+  used_at: string | null;
+  is_bootstrap: boolean;
+}
+
+export async function fetchInvitationCodes(): Promise<InvitationCodeRow[]> {
+  const { data, error } = await supabase.rpc('admin_list_invitation_codes');
+  if (error) throw error;
+  return (data as InvitationCodeRow[]) ?? [];
+}
+
+/** Generates a new invitation code server-side and returns it. The code is
+ * never generated client-side and never inserted directly by the browser. */
+export async function generateInvitationCode(): Promise<string> {
+  const { data, error } = await supabase.rpc('admin_generate_invitation_code');
+  if (error) throw error;
+  if (typeof data !== 'string' || !data) {
+    throw new Error('Invitation code generation returned no data');
+  }
+  return data;
 }

@@ -202,22 +202,43 @@ GRANT EXECUTE ON FUNCTION public.create_user_profile(text, text, text, text, tex
 -- ============ 2b. Self-verification ============
 -- Runs only at the moment this migration is actually applied by the
 -- operator (not executed as part of writing this file). Aborts the entire
--- migration transaction — rolling back everything above — if either check
+-- migration transaction — rolling back everything above — if any check
 -- fails, so a partially-correct state can never be left behind silently.
+--
+-- IMPORTANT: this identifies create_user_profile by pg_proc.pronargs
+-- (argument count) and pg_proc.proargtypes (the argument type OID vector)
+-- — never by pg_get_function_identity_arguments()'s DISPLAY text. That
+-- function reconstructs a full name-and-type declaration list whenever a
+-- function's parameters were declared with names — e.g. 'p_user_id text,
+-- p_email text, p_full_name text, ...' — not a bare, name-free type list.
+-- Every create_user_profile parameter in this schema has always been
+-- named, so an earlier version of this check, which compared against the
+-- hardcoded name-free string 'text, text, text, text, text, text[, text]',
+-- could never match anything real: the "old 6-arg gone" check was a silent
+-- no-op, and the "new 7-arg exists" check unconditionally raised
+-- 'new 7-argument create_user_profile not found' even when it existed —
+-- rolling back this entire transaction, including the DROP FUNCTION that
+-- had already succeeded, and leaving the old 6-argument function in place.
+-- pronargs/proargtypes are structured catalog columns, not display
+-- formatting, so they carry no such ambiguity.
 DO $$
 DECLARE
   v_count integer;
+  v_nargs integer;
+  v_all_text boolean;
 BEGIN
+  -- 1. The old 6-argument overload must be gone.
   IF EXISTS (
     SELECT 1 FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public'
       AND p.proname = 'create_user_profile'
-      AND pg_get_function_identity_arguments(p.oid) = 'text, text, text, text, text, text'
+      AND p.pronargs = 6
   ) THEN
     RAISE EXCEPTION 'Migration verification failed: old 6-argument create_user_profile still exists';
   END IF;
 
+  -- 2. Exactly one create_user_profile must exist in the schema.
   SELECT count(*) INTO v_count
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -227,14 +248,24 @@ BEGIN
     RAISE EXCEPTION 'Migration verification failed: expected exactly 1 create_user_profile, found %', v_count;
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'public'
-      AND p.proname = 'create_user_profile'
-      AND pg_get_function_identity_arguments(p.oid) = 'text, text, text, text, text, text, text'
-  ) THEN
-    RAISE EXCEPTION 'Migration verification failed: new 7-argument create_user_profile not found';
+  -- 3. That one function must have exactly 7 arguments, all of type text.
+  SELECT p.pronargs INTO v_nargs
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public' AND p.proname = 'create_user_profile';
+
+  IF v_nargs <> 7 THEN
+    RAISE EXCEPTION 'Migration verification failed: create_user_profile has % argument(s), expected 7', v_nargs;
+  END IF;
+
+  SELECT bool_and(argtype = 'text'::regtype) INTO v_all_text
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  CROSS JOIN LATERAL unnest(p.proargtypes::oid[]) AS argtype
+  WHERE n.nspname = 'public' AND p.proname = 'create_user_profile';
+
+  IF NOT COALESCE(v_all_text, false) THEN
+    RAISE EXCEPTION 'Migration verification failed: create_user_profile does not have 7 text arguments';
   END IF;
 END $$;
 

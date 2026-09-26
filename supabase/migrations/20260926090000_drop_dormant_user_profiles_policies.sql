@@ -1,0 +1,47 @@
+-- Remove dormant user_profiles RLS policies (defense-in-depth cleanup).
+--
+-- ## Problem
+--
+-- 20260906091501_lock_down_table_rls_policies.sql revoked authenticated's
+-- direct INSERT/UPDATE table privilege on user_profiles ("REVOKE INSERT,
+-- UPDATE ON public.user_profiles FROM authenticated;"), so all profile
+-- creation and mutation is intended to go exclusively through the
+-- SECURITY DEFINER RPCs (create_user_profile, admin_adjust_balance,
+-- admin_set_start_access, etc.).
+--
+-- That migration revoked the table-level GRANT, but never dropped the
+-- three RLS policies from 20260823095533_...fix_user_profiles_user_id_
+-- mismatch...sql (and 20260823100627's rewrite of the third) that were
+-- written for an earlier, more permissive design:
+--   - insert_own_profile        (INSERT, WITH CHECK auth.uid() = user_id)
+--   - update_own_profile        (UPDATE, USING/CHECK auth.uid() = user_id)
+--   - admin_update_all_profiles (UPDATE, USING/CHECK is_admin_user())
+--
+-- With no INSERT/UPDATE table privilege granted to authenticated, Postgres
+-- rejects any INSERT/UPDATE attempt on user_profiles before RLS is ever
+-- consulted, so these three policies are currently inert. They are
+-- deliberately unnecessary dormant security state, not a currently
+-- exploitable hole: if a future migration ever re-grants INSERT/UPDATE to
+-- authenticated on this table (even inadvertently, e.g. a broad
+-- "GRANT ALL ON ALL TABLES IN SCHEMA public"), these policies would
+-- immediately reactivate — and update_own_profile's row-level check places
+-- no restriction on *which columns* a user may change, meaning a caller
+-- could set their own role/balance/vip_level directly, bypassing every
+-- SECURITY DEFINER RPC and its authorization checks.
+--
+-- ## Fix
+--
+-- Drop all three policies outright. No replacement policy is added: the
+-- table-level REVOKE from 20260906091501 already fully closes this path
+-- today, and every legitimate write already goes through the RPCs, which
+-- are SECURITY DEFINER and unaffected by caller-side grants or policies.
+--
+-- This migration does not change any GRANT/REVOKE, does not touch RLS's
+-- enabled state on user_profiles (it remains ENABLE ROW LEVEL SECURITY),
+-- does not add any replacement policy, and does not touch
+-- select_own_profile / admin_select_all_profiles (still required for
+-- normal profile reads) or any other table, function, or migration.
+
+DROP POLICY IF EXISTS "insert_own_profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "update_own_profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "admin_update_all_profiles" ON public.user_profiles;

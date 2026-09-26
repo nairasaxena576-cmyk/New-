@@ -18,6 +18,7 @@ import {
   ScrollText,
   Ticket,
   CreditCard,
+  KeyRound,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -66,6 +67,7 @@ export const adminNavGroups: AdminNavGroup[] = [
     label: 'Management',
     items: [
       { label: 'Users', to: '/admin/users', icon: Users },
+      { label: 'Invitation Codes', to: '/admin/invitations', icon: KeyRound },
       { label: 'Deposits', to: '/admin/deposits', icon: Wallet },
       { label: 'Withdrawals', to: '/admin/withdrawals', icon: ArrowDownToLine },
       { label: 'Orders', to: '/admin/orders', icon: ClipboardList },
